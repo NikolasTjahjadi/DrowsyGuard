@@ -1,0 +1,9 @@
+subclass,model,n,accuracy,f1,recall,precision
+sleepyCombination,CNN,2660,0.7989,0.8882,0.7989,1.0
+sleepyCombination,LR_Fusion,2660,0.8278,0.9058,0.8278,1.0
+slowBlinkWithNodding,CNN,1408,0.8956,0.9449,0.8956,1.0
+slowBlinkWithNodding,LR_Fusion,1408,0.9311,0.9643,0.9311,1.0
+yawning,CNN,1328,0.6845,0.8127,0.6845,1.0
+yawning,LR_Fusion,1328,0.8298,0.907,0.8298,1.0
+notdrowsy,CNN,4453,0.9308,0.0,0.0,0.0
+notdrowsy,LR_Fusion,4453,0.9194,0.0,0.0,0.0

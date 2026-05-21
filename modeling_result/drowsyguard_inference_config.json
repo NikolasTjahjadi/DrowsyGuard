@@ -1,0 +1,32 @@
+{
+  "dataset": "NTHU-DDD Multi-Class",
+  "fusion": {
+    "model": "drowsyguard_lr_fusion.pkl",
+    "alert_threshold": 0.25,
+    "feature_order": [
+      "cnn_prob",
+      "ear_inv_norm",
+      "mar_norm",
+      "pitch_norm"
+    ],
+    "scalers": {
+      "ear": {
+        "min": 0.010567150873023212,
+        "max": 2.5263151132419797
+      },
+      "mar": {
+        "min": 0.39127143422855976,
+        "max": 2.38486750651642
+      },
+      "pitch": {
+        "min": -179.99650567123993,
+        "max": 179.99948028953042
+      }
+    }
+  },
+  "temporal_smoother": {
+    "window_size": 5,
+    "alert_threshold": 0.25,
+    "note": "Re-calibrate window_size on real video at deployment"
+  }
+}
