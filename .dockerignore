@@ -1,0 +1,11 @@
+.git
+.gitignore
+README.md
+backend/.venv
+frontend/node_modules
+frontend/dist
+modeling_result/drowsyguard_features.csv
+modeling_result/drowsyguard_mobilenetv2.h5
+**/__pycache__
+**/*.pyc
+.DS_Store

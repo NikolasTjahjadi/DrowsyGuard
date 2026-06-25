@@ -76,3 +76,13 @@ async def predict(frame: UploadFile = File(...)) -> dict:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Inference failed: {exc}") from exc
+
+# Serve frontend build dari container yang sama (buat Azure deploy)
+import os
+try:
+    from fastapi.staticfiles import StaticFiles
+    _dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+    if os.path.isdir(_dir):
+        app.mount("/", StaticFiles(directory=_dir, html=True), name="frontend")
+except Exception:
+    pass
