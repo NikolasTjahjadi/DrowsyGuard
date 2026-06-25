@@ -49,7 +49,7 @@ class DrowsyGuardInference:
         self.perclos_samples: deque[tuple[float, bool]] = deque()
         self.pitch_calibration_samples: deque[float] = deque(maxlen=45)
         self.pitch_baseline: float | None = None
-        self.ear_threshold = 0.25
+        self.ear_threshold = 0.15
         self.mar_threshold = 0.60
         self.pitch_threshold = 25.0
         self.alert_threshold = 0.25
