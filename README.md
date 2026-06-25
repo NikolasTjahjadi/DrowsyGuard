@@ -161,7 +161,7 @@ Returns:
 ## Alert Logic
 
 - `MEDIUM`: yawning, elevated PERCLOS, or warning-level fusion score
-- `HIGH`: eyes closed, head nodding, or model alert
+- `HIGH`: eyes closed for at least 2 seconds, head nodding, or model alert
 - `CRITICAL`: model alert plus a strong physical signal such as eyes closed, head nodding, or high PERCLOS
 
 ## Notes

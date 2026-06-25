@@ -53,6 +53,7 @@ class DrowsyGuardInference:
         self.mar_threshold = 0.60
         self.pitch_threshold = 25.0
         self.alert_threshold = 0.25
+        self._eye_closed_since: float | None = None
 
     def load(self) -> None:
         config_path = self.model_dir / "drowsyguard_inference_config.json"
@@ -178,10 +179,20 @@ class DrowsyGuardInference:
         relative_pitch, head_calibrating = self._relative_pitch(raw_pitch, eye_closed, yawning)
         head_nodding = (not head_calibrating) and abs(relative_pitch) > self.pitch_threshold
         perclos = self._update_perclos(eye_closed)
+
+        now = time.monotonic()
+        if eye_closed:
+            if self._eye_closed_since is None:
+                self._eye_closed_since = now
+            sustained_eye_closed = (now - self._eye_closed_since) >= 2.0
+        else:
+            self._eye_closed_since = None
+            sustained_eye_closed = False
+
         model_alert = bool(smooth["alert"])
-        rule_alert = bool(eye_closed or yawning or head_nodding)
+        rule_alert = bool(sustained_eye_closed or yawning or head_nodding)
         alert = bool(model_alert or rule_alert)
-        alert_sources = self._alert_sources(model_alert, eye_closed, yawning, head_nodding)
+        alert_sources = self._alert_sources(model_alert, sustained_eye_closed, yawning, head_nodding)
 
         return {
             "ear": round(float(ear), 4),
@@ -199,8 +210,9 @@ class DrowsyGuardInference:
             "rule_alert": rule_alert,
             "alert_sources": alert_sources,
             "alert": alert,
-            "drowsiness_level": self._level(smooth["smoothed"], model_alert, eye_closed, yawning, head_nodding, perclos),
+            "drowsiness_level": self._level(smooth["smoothed"], model_alert, sustained_eye_closed, yawning, head_nodding, perclos),
             "eye_closed": bool(eye_closed),
+            "eye_closed_sustained": bool(sustained_eye_closed),
             "yawning": bool(yawning),
             "head_nodding": bool(head_nodding),
             "landmarks_detected": True,
