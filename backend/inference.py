@@ -53,7 +53,8 @@ class DrowsyGuardInference:
         self.mar_threshold = 0.60
         self.pitch_threshold = 25.0
         self.alert_threshold = 0.25
-        self._eye_closed_since: float | None = None
+        self._eye_closed_frames: int = 0
+        self.eye_closed_frame_threshold: int = 3
 
     def load(self) -> None:
         config_path = self.model_dir / "drowsyguard_inference_config.json"
@@ -180,14 +181,11 @@ class DrowsyGuardInference:
         head_nodding = (not head_calibrating) and abs(relative_pitch) > self.pitch_threshold
         perclos = self._update_perclos(eye_closed)
 
-        now = time.monotonic()
         if eye_closed:
-            if self._eye_closed_since is None:
-                self._eye_closed_since = now
-            sustained_eye_closed = (now - self._eye_closed_since) >= 2.0
+            self._eye_closed_frames += 1
         else:
-            self._eye_closed_since = None
-            sustained_eye_closed = False
+            self._eye_closed_frames = 0
+        sustained_eye_closed = self._eye_closed_frames >= self.eye_closed_frame_threshold
 
         model_alert = bool(smooth["alert"])
         rule_alert = bool(sustained_eye_closed or yawning or head_nodding)
