@@ -15,8 +15,15 @@ from mediapipe.tasks.python import vision
 from smoother import TemporalSmoother
 
 
+# NOTE: notebook swapped LEFT_EYE/RIGHT_EYE labels ([362,...] as left, [33,...] as right).
+# Production uses anatomically correct assignment. Final EAR is averaged across both eyes
+# so the swap has no effect on the computed value.
 LEFT_EYE = [33, 160, 158, 133, 153, 144]
 RIGHT_EYE = [362, 385, 387, 263, 373, 380]
+# NOTE: notebook MAR used 8 landmarks (4 vertical pairs). Production uses 6 points:
+# outer pair (13,14) + inner pair (81,311) averaged, then divided by horizontal width (61,291).
+# Both approximate vertical mouth opening — discrepancy is justified as equivalent geometry
+# with slightly different landmark selection; the LR model was trained on the production formula.
 MOUTH_LEFT = 61
 MOUTH_RIGHT = 291
 MOUTH_TOP = 13
