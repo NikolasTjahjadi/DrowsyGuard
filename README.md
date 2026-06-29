@@ -1,4 +1,4 @@
-# DrowsyGuard
+**# DrowsyGuard
 
 Real-time driver fatigue detection using facial landmarks, head pose, CNN inference, logistic-regression fusion, and temporal smoothing.
 
@@ -169,3 +169,4 @@ Returns:
 - The backend uses MediaPipe Tasks API `FaceLandmarker` in `IMAGE` mode.
 - The frontend sends a new frame only after the previous prediction returns, so it naturally throttles to backend speed.
 - Head nod detection is calibrated against the user's neutral head pose to reduce false positives from webcam angle.
+**
