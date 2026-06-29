@@ -1,33 +1,45 @@
-**# DrowsyGuard
+# DrowsyGuard
 
-Real-time driver fatigue detection using facial landmarks, head pose, CNN inference, logistic-regression fusion, and temporal smoothing.
-
-This repository now contains both the trained model artifacts and a fullstack webcam dashboard.
+Real-time driver fatigue detection using MediaPipe facial landmark extraction, geometric feature analysis (EAR, MAR, head pose via PnP), MobileNetV2 CNN inference, Logistic Regression fusion, and temporal smoothing.
 
 ## What It Detects
 
 DrowsyGuard monitors the driver's face from a webcam and estimates:
 
-- Eye closure using Eye Aspect Ratio (EAR)
-- Yawning using Mouth Aspect Ratio (MAR)
-- Head nodding using calibrated head-pose pitch
-- CNN drowsiness probability from `drowsyguard_best.h5`
-- Final model fusion score from `drowsyguard_lr_fusion.pkl`
-- Alert levels: `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`
+- **Eye closure** — Eye Aspect Ratio (EAR), threshold < 0.15 sustained ≥3 frames
+- **Yawning** — Mouth Aspect Ratio (MAR), threshold > 0.60
+- **Head nodding** — calibrated pitch deviation > 25° from per-session neutral baseline
+- **CNN drowsiness probability** — MobileNetV2 (`drowsyguard_best.h5`)
+- **Fusion score** — Logistic Regression meta-learner (`drowsyguard_lr_fusion.pkl`) combining CNN probability, inverted EAR, MAR, and head pitch
+- **PERCLOS** — percentage of eye closure over a 30-second rolling window, used as a severity indicator only
+- **Alert levels** — `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`
 
-The app keeps the model score honest: `fusion_score` remains the output of the trained CNN + LR model. Runtime rule alerts can still trigger sound/visual warnings when strong physical signals appear, such as eyes closed or head nodding.
+### Alert Logic
+
+The final alert is determined by the union of two independent signals:
+- `model_alert` — smoothed LR fusion score > 0.25 (window=5 frames)
+- `rule_alert` — sustained eye closure (EAR < 0.15 for ≥3 consecutive frames), yawning, or head nodding
+
+| Level | Condition |
+|-------|-----------|
+| `LOW` | Fusion score below alert threshold, no physical signals |
+| `MEDIUM` | Yawning detected, or PERCLOS ≥ 15%, or fusion score approaching threshold |
+| `HIGH` | Eyes closed, head nodding, or model alert triggered |
+| `CRITICAL` | Model alert AND at least one strong physical signal (eye closed, head nodding, or PERCLOS ≥ 25%) |
+
+The rule-based layer uses deliberately stricter thresholds than the experimental baseline (EAR 0.15 vs 0.25, with 3-frame persistence) and serves as a fail-safe that complements rather than replaces the learned model.
 
 ## Repository Structure
 
 ```text
 DrowsyGuard/
 ├── backend/
-│   ├── main.py
-│   ├── inference.py
-│   ├── smoother.py
+│   ├── main.py                          # FastAPI app, API routes
+│   ├── inference.py                     # DrowsyGuardInference class (full pipeline)
+│   ├── smoother.py                      # TemporalSmoother (window=5, threshold=0.25)
 │   ├── requirements.txt
 │   └── models/
-│       └── face_landmarker.task
+│       └── face_landmarker.task         # MediaPipe FaceLandmarker task asset
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
@@ -37,68 +49,71 @@ DrowsyGuard/
 │   ├── package.json
 │   └── vite.config.js
 ├── modeling_result/
-│   ├── drowsyguard_best.h5
-│   ├── drowsyguard_lr_fusion.pkl
-│   └── drowsyguard_inference_config.json
+│   ├── drowsyguard_best.h5              # Fine-tuned MobileNetV2 CNN
+│   ├── drowsyguard_lr_fusion.pkl        # Trained LR meta-learner + scalers
+│   └── drowsyguard_inference_config.json  # Scaler params, feature order, smoother config
 └── docker-compose.yml
 ```
 
 ## Model Artifacts
 
-The backend loads the existing artifacts from `modeling_result/`:
+The backend loads artifacts from `modeling_result/`:
 
-- `drowsyguard_best.h5` - fine-tuned MobileNetV2 CNN
-- `drowsyguard_lr_fusion.pkl` - Logistic Regression meta-learner
-- `drowsyguard_inference_config.json` - scaler and smoother config
+- `drowsyguard_best.h5` — MobileNetV2 fine-tuned on NTHU-DDD (128×128 input, sigmoid output)
+- `drowsyguard_lr_fusion.pkl` — LR meta-learner with coefficients: CNN_prob +6.503, EAR_inv +4.512, MAR_norm −3.516, Pitch_norm −0.541
+- `drowsyguard_inference_config.json` — MinMax scaler params, feature order, temporal smoother settings
 
-MediaPipe FaceLandmarker uses the task asset at:
+MediaPipe FaceLandmarker task asset:
 
 ```text
 backend/models/face_landmarker.task
 ```
 
-## Backend Setup
+## Setup
 
-Use Python 3.10 or 3.11. TensorFlow on Windows may fail on Python 3.13.
+### Option 1 — Docker (recommended)
 
-```powershell
+```bash
+docker compose up
+```
+
+Frontend: http://localhost:3000  
+Backend: http://localhost:8000
+
+### Option 2 — Manual
+
+**Backend** (Python 3.10 or 3.11 required; TensorFlow may fail on Python 3.13)
+
+```bash
 cd backend
-py -3.11 -m venv .venv
+python -m venv .venv
+
+# Windows
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+# macOS / Linux
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Health check:
+**Frontend**
 
-```text
-http://localhost:8000/api/health
-```
-
-## Frontend Setup
-
-```powershell
+```bash
 cd frontend
-npm.cmd install
-npm.cmd run dev
+npm install
+npm run dev
 ```
 
-Open:
-
-```text
-http://localhost:3000
-```
-
-Allow camera permission. The webcam is used to monitor the driver's face, not to detect cars.
+Open http://localhost:3000 and allow camera permission.
 
 ## API
 
 ### `GET /api/health`
 
 ```json
-{
-  "status": "ok",
-  "model_loaded": true
-}
+{ "status": "ok", "model_loaded": true }
 ```
 
 ### `GET /api/config`
@@ -107,26 +122,26 @@ Returns runtime thresholds and raw inference config.
 
 ### `POST /api/config`
 
-Updates app-side thresholds at runtime:
+Updates runtime thresholds without retraining or modifying model files.
 
 ```json
 {
-  "ear_threshold": 0.25,
-  "mar_threshold": 0.6,
-  "pitch_threshold": 25,
+  "ear_threshold": 0.15,
+  "mar_threshold": 0.60,
+  "pitch_threshold": 25.0,
   "alert_threshold": 0.25
 }
 ```
 
-These thresholds do not retrain or modify the model files.
+Accepted ranges: EAR 0.15–0.35, MAR 0.40–0.80, Pitch 15–45°, Alert 0.25–0.80.
 
 ### `POST /api/calibrate/head`
 
-Resets neutral head-pose calibration. Face the camera normally for 1-2 seconds after calling it.
+Resets per-session head pitch calibration. Look directly at the camera for 1–2 seconds after calling. The system collects 18 frames to establish your neutral head position baseline before head nodding detection activates.
 
 ### `POST /api/predict`
 
-Accepts multipart form data:
+Accepts a multipart JPEG webcam frame:
 
 ```text
 frame=<jpeg webcam frame>
@@ -140,6 +155,8 @@ Returns:
   "mar": 0.45,
   "head_pitch": 12.3,
   "raw_head_pitch": -8.1,
+  "head_pitch_baseline": -20.4,
+  "head_calibrating": false,
   "head_yaw": -3.1,
   "head_roll": 1.2,
   "cnn_prob": 0.87,
@@ -147,26 +164,23 @@ Returns:
   "smoothed_score": 0.68,
   "model_alert": true,
   "rule_alert": true,
-  "alert": true,
   "alert_sources": ["MODEL", "EYE_CLOSED"],
+  "alert": true,
   "drowsiness_level": "CRITICAL",
   "eye_closed": true,
+  "eye_closed_sustained": true,
   "yawning": false,
   "head_nodding": false,
   "landmarks_detected": true,
-  "fps": 28.5
+  "perclos": 0.23,
+  "face_box": { "x": 0.21, "y": 0.08, "w": 0.54, "h": 0.72 },
+  "fps": 14.2
 }
 ```
 
-## Alert Logic
-
-- `MEDIUM`: yawning, elevated PERCLOS, or warning-level fusion score
-- `HIGH`: eyes closed for at least 2 seconds, head nodding, or model alert
-- `CRITICAL`: model alert plus a strong physical signal such as eyes closed, head nodding, or high PERCLOS
-
 ## Notes
 
-- The backend uses MediaPipe Tasks API `FaceLandmarker` in `IMAGE` mode.
-- The frontend sends a new frame only after the previous prediction returns, so it naturally throttles to backend speed.
-- Head nod detection is calibrated against the user's neutral head pose to reduce false positives from webcam angle.
-**
+- The frontend sends a new frame only after the previous prediction returns, naturally throttling to backend speed.
+- Head pitch calibration collects 18 non-drowsy frames at session start. Call `POST /api/calibrate/head` to reset if your posture or camera angle changes.
+- PERCLOS is computed over a 30-second rolling window and used only to determine drowsiness severity level — it does not directly trigger alerts.
+- The backend serves the frontend static build from `frontend/dist/` when deployed as a single container.
